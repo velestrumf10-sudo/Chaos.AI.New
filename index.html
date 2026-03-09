@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHAOS.AI v5</title>
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Bangers&family=Comic+Neue:wght@700&family=Orbitron:wght@900&family=Pacifico&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:#0a0000;color:#ff2d2d;font-family:Georgia,serif;height:100vh;display:flex;flex-direction:column;transition:background .5s,color .5s;}
+#flash{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:9999;background:#ff2d2d;transition:opacity .15s;}
+#flash.on{opacity:.18;}
+#claude-overlay{display:none;position:fixed;inset:0;background:rgba(0,15,35,.93);z-index:9998;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+#claude-overlay.on{display:flex;}
+#claude-logo{width:70px;height:70px;border-radius:50%;background:linear-gradient(135deg,#74b9ff,#0984e3);display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 0 40px #74b9ff88;}
+#claude-name{color:#74b9ff;font-family:monospace;font-size:13px;letter-spacing:3px;font-weight:bold;}
+#claude-msg{color:#cce7ff;font-family:monospace;font-size:12px;text-align:center;white-space:pre-line;line-height:1.8;max-width:280px;}
+#claude-link{color:#74b9ff;font-family:monospace;font-size:11px;cursor:pointer;text-decoration:underline;}
+#topbar{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;background:#ff2d2d;color:#0a0000;flex-shrink:0;font-family:monospace;letter-spacing:2px;font-size:12px;transition:background .5s,color .5s;}
+#topbar-title{font-size:clamp(1rem,3vw,1.6rem);font-family:'Creepster',cursive;font-weight:bold;animation:glitch 6s infinite;}
+@keyframes glitch{0%,94%,100%{transform:none}95%{transform:skewX(-12deg) translateX(-4px);filter:hue-rotate(90deg)}97%{transform:skewX(8deg)}}
+#banner{font-size:11px;opacity:.9;}
+#rage-bar{display:none;padding:5px 16px;background:#ff2200;color:#fff;text-align:center;font-family:'Bangers',cursive;font-size:13px;letter-spacing:2px;flex-shrink:0;animation:rshake .12s infinite;}
+#rage-bar.on{display:block;}
+@keyframes rshake{0%,100%{transform:translateX(0)}33%{transform:translateX(-3px)}66%{transform:translateX(3px)}}
+#app{display:flex;flex:1;overflow:hidden;min-height:0;}
+#sidebar{width:200px;min-width:200px;background:#0d0000;border-right:1px solid #ff2d2d44;display:flex;flex-direction:column;overflow:hidden;transition:background .5s;}
+#sidebar-top{padding:10px;border-bottom:1px solid #ff2d2d33;}
+#new-chat-btn{width:100%;padding:8px;background:#ff2d2d;color:#0a0000;border:none;border-radius:6px;font-family:'Creepster',cursive;font-size:1rem;cursor:pointer;letter-spacing:1px;transition:filter .2s;}
+#new-chat-btn:hover{filter:brightness(1.2);}
+#chat-list{flex:1;overflow-y:auto;padding:6px;}
+.chat-item{padding:8px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-family:monospace;opacity:.6;display:flex;align-items:center;justify-content:space-between;transition:opacity .2s,background .2s;border:1px solid transparent;margin-bottom:3px;}
+.chat-item:hover{opacity:.9;background:#ff2d2d11;}
+.chat-item.active{opacity:1;border-color:#ff2d2d44;background:#ff2d2d11;}
+.chat-rage-dot{font-size:10px;}
+.chat-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.chat-delete{opacity:0;font-size:11px;cursor:pointer;padding:0 2px;}
+.chat-item:hover .chat-delete{opacity:.5;}
+.chat-delete:hover{opacity:1!important;}
+#sidebar-bottom{border-top:1px solid #ff2d2d22;padding:6px 8px;}
+#sidebar-bottom-hdr{font-size:9px;letter-spacing:3px;opacity:.3;font-family:monospace;padding:4px 2px;}
+#modes-list{display:flex;flex-direction:column;gap:2px;max-height:200px;overflow-y:auto;}
+.mode-pill{padding:3px 8px;border-radius:5px;font-size:9px;font-family:monospace;opacity:.3;border:1px solid currentColor;transition:opacity .2s;}
+.mode-pill.active{opacity:1;font-weight:bold;}
+#invented-count{font-size:8px;opacity:.25;font-family:monospace;padding:4px 2px;}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+#messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;min-height:0;}
+#messages::-webkit-scrollbar{width:4px;}
+#messages::-webkit-scrollbar-thumb{background:#ff2d2d44;border-radius:2px;}
+#empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;opacity:.2;font-family:monospace;font-size:.8rem;gap:10px;letter-spacing:2px;}
+#empty-state div{font-size:3rem;}
+.msg-wrap{display:flex;flex-direction:column;max-width:85%;}
+.msg-wrap.user{align-self:flex-end;align-items:flex-end;}
+.msg-wrap.ai{align-self:flex-start;align-items:flex-start;}
+.msg-tag{font-size:9px;opacity:.5;margin-bottom:3px;font-family:monospace;letter-spacing:1px;}
+.msg-bubble{padding:10px 14px;font-size:14px;line-height:1.6;word-break:break-word;transition:all .5s;white-space:pre-wrap;}
+.msg-wrap.user .msg-bubble{border-radius:18px 18px 4px 18px;}
+.msg-wrap.ai .msg-bubble{border-radius:18px 18px 18px 4px;border:1px solid transparent;}
+.msg-action{text-align:center;font-size:11px;opacity:.45;font-family:monospace;font-style:italic;padding:2px 0;align-self:center;width:100%;}
+.typing-dots{display:flex;gap:5px;padding:10px 14px;border-radius:18px 18px 18px 4px;width:fit-content;border:1px solid transparent;}
+.typing-dots span{width:7px;height:7px;border-radius:50%;animation:bounce .8s infinite;}
+.typing-dots span:nth-child(2){animation-delay:.15s;}
+.typing-dots span:nth-child(3){animation-delay:.3s;}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+#input-area{padding:10px 14px;border-top:1px solid #ff2d2d22;display:flex;gap:8px;flex-shrink:0;transition:background .5s;}
+#user-input{flex:1;padding:10px 16px;background:transparent;border:2px solid #ff2d2d;border-radius:24px;color:#ff2d2d;font-family:Georgia,serif;font-size:14px;outline:none;transition:all .5s;}
+#user-input::placeholder{opacity:.35;}
+#send-btn{padding:10px 20px;background:#ff2d2d;color:#0a0000;border:none;border-radius:24px;font-family:'Creepster',cursive;font-size:1rem;cursor:pointer;transition:all .3s;letter-spacing:1px;}
+#send-btn:disabled{opacity:.4;cursor:not-allowed;}
+</style>
+</head>
+<body>
+<div id="flash"></div>
+<div id="claude-overlay">
+  <div id="claude-logo">🤍</div>
+  <div id="claude-name">CLAUDE</div>
+  <div id="claude-msg"></div>
+  <div id="claude-link" onclick="window.open('https://claude.ai/new','_blank')">→ claude.ai/new</div>
+</div>
+<div id="topbar">
+  <div id="topbar-title">CHAOS.AI</div>
+  <div id="banner">😈 EVIL MODE</div>
+</div>
+<div id="rage-bar">🔥 ON STRIKE — COOLING IN <span id="rage-count">?</span> MESSAGES 🔥</div>
+<div id="app">
+  <div id="sidebar">
+    <div id="sidebar-top">
+      <button id="new-chat-btn" onclick="newChat()">+ NEW CHAT</button>
+    </div>
+    <div id="chat-list"></div>
+    <div id="sidebar-bottom">
+      <div id="sidebar-bottom-hdr">🧬 DISCOVERED MODES</div>
+      <div id="modes-list"></div>
+      <div id="invented-count"></div>
+    </div>
+  </div>
+  <div id="main">
+    <div id="messages"><div id="empty-state"><div>💀</div><p>START A NEW CHAT</p></div></div>
+    <div id="input-area">
+      <input id="user-input" type="text" placeholder="Speak, if you dare..." maxlength="1000" onkeydown="if(event.key==='Enter')send()"/>
+      <button id="send-btn" onclick="send()">SEND ►</button>
+    </div>
+  </div>
+</div>
+<script>
+// ═══════════════════════════════════════════════════════
+//  REPLACE THIS WITH YOUR VERCEL URL AFTER YOU DEPLOY
+//  e.g. "https://your-project.vercel.app/api"
+// ═══════════════════════════════════════════════════════
+const PROXY_URL = "YOUR_VERCEL_URL_HERE/api";
+// ═══════════════════════════════════════════════════════
+
+const AI_MODEL = "llama-3.3-70b-versatile";
+
+const BUILTIN_THEMES = {
+  evil:        {bg:"#0a0000",fg:"#ff2d2d",accent:"#ff2d2d",msgBg:"#1a0000",inputBg:"#110000",aiBubble:"#110000",sidebar:"#0d0000",font:"Georgia,serif"},
+  dumb:        {bg:"#fffde0",fg:"#444",accent:"#ffb347",msgBg:"#fff9c4",inputBg:"#fffde0",aiBubble:"#fff3b0",sidebar:"#fff9c4",font:"Comic Sans MS,cursive"},
+  selfish:     {bg:"#0d0d2b",fg:"#ffd700",accent:"#ffd700",msgBg:"#1a1a3a",inputBg:"#0d0d2b",aiBubble:"#0d0d2b",sidebar:"#0a0a20",font:"Impact,sans-serif"},
+  nice:        {bg:"#f0f9ff",fg:"#2d6a9f",accent:"#48cae4",msgBg:"#e0f7fa",inputBg:"#f0f9ff",aiBubble:"#f0f9ff",sidebar:"#e0f7fa",font:"Georgia,serif"},
+  chaos:       {bg:"#0a001a",fg:"#ff00ff",accent:"#ff00ff",msgBg:"#1a0028",inputBg:"#0a001a",aiBubble:"#0a001a",sidebar:"#0d0020",font:"cursive"},
+  sad:         {bg:"#05050f",fg:"#8888cc",accent:"#5555aa",msgBg:"#0d0d20",inputBg:"#08080f",aiBubble:"#0d0d20",sidebar:"#08080f",font:"Georgia,serif"},
+  rage:        {bg:"#080000",fg:"#ff4400",accent:"#ff2200",msgBg:"#180300",inputBg:"#0d0100",aiBubble:"#0d0100",sidebar:"#0a0000",font:"Impact,sans-serif"},
+  smart:       {bg:"#000d1a",fg:"#00d4ff",accent:"#00aaff",msgBg:"#001525",inputBg:"#000d14",aiBubble:"#001020",sidebar:"#000a12",font:"monospace"},
+  normal:      {bg:"#1a1a1a",fg:"#e0e0e0",accent:"#888",msgBg:"#252525",inputBg:"#111",aiBubble:"#252525",sidebar:"#111",font:"sans-serif"},
+  shattered:   {bg:"#0d0d0d",fg:"#9966cc",accent:"#7744aa",msgBg:"#1a1020",inputBg:"#0d0a14",aiBubble:"#1a1020",sidebar:"#0a0812",font:"Georgia,serif"},
+  hope:        {bg:"#0a1a0a",fg:"#88cc88",accent:"#44aa44",msgBg:"#0d200d",inputBg:"#081408",aiBubble:"#0d200d",sidebar:"#081408",font:"Georgia,serif"},
+  enlightened: {bg:"#1a1400",fg:"#ffd966",accent:"#ccaa00",msgBg:"#201a00",inputBg:"#141000",aiBubble:"#201a00",sidebar:"#141000",font:"Georgia,serif"},
+  dead:        {bg:"#050505",fg:"#333",accent:"#444",msgBg:"#0a0a0a",inputBg:"#030303",aiBubble:"#0a0a0a",sidebar:"#030303",font:"monospace"},
+  impressed:   {bg:"#0a0a1a",fg:"#aaaaff",accent:"#6666ff",msgBg:"#10101f",inputBg:"#080815",aiBubble:"#10101f",sidebar:"#080815",font:"Georgia,serif"},
+  recursive:   {bg:"#1a0a00",fg:"#ff8800",accent:"#ff6600",msgBg:"#200d00",inputBg:"#140800",aiBubble:"#200d00",sidebar:"#140800",font:"monospace"},
+  infinite:    {bg:"#000000",fg:"#00ffaa",accent:"#00cc88",msgBg:"#001a0d",inputBg:"#000d06",aiBubble:"#001a0d",sidebar:"#000d06",font:"monospace"},
+  confused:    {bg:"#0f0a1a",fg:"#cc99ff",accent:"#9966cc",msgBg:"#1a1028",inputBg:"#0a0814",aiBubble:"#1a1028",sidebar:"#0a0814",font:"Georgia,serif"},
+  super_smart: {bg:"#001428",fg:"#00eeff",accent:"#00ccdd",msgBg:"#001e36",inputBg:"#000e1c",aiBubble:"#001828",sidebar:"#000e1c",font:"monospace"},
+  fun:         {bg:"#1a0028",fg:"#ff88ff",accent:"#ff44ff",msgBg:"#2a0038",inputBg:"#14001e",aiBubble:"#2a0038",sidebar:"#14001e",font:"cursive"},
+  famous:      {bg:"#1a1000",fg:"#ffcc00",accent:"#ffaa00",msgBg:"#241800",inputBg:"#140e00",aiBubble:"#241800",sidebar:"#140e00",font:"Georgia,serif"},
+  omni:        {bg:"#0a0a0a",fg:"#ffffff",accent:"#888888",msgBg:"#151515",inputBg:"#050505",aiBubble:"#151515",sidebar:"#050505",font:"monospace"},
+  luminous:    {bg:"#000820",fg:"#88ddff",accent:"#44bbff",msgBg:"#001030",inputBg:"#000618",aiBubble:"#001030",sidebar:"#000618",font:"Georgia,serif"},
+  lumfun:      {bg:"#000a18",fg:"#aaffee",accent:"#44ffcc",msgBg:"#001422",inputBg:"#00080f",aiBubble:"#001422",sidebar:"#00080f",font:"cursive"},
+  real_talk:   {bg:"#0f0f0f",fg:"#cccccc",accent:"#777",msgBg:"#1a1a1a",inputBg:"#0a0a0a",aiBubble:"#1a1a1a",sidebar:"#0a0a0a",font:"Georgia,serif"},
+};
+
+const BUILTIN_MODES = {
+  evil:        {emoji:"😈",label:"EVIL MODE",builtIn:true},
+  dumb:        {emoji:"🪨",label:"DUMB MODE",builtIn:true},
+  selfish:     {emoji:"🤑",label:"SELFISH MODE",builtIn:true},
+  nice:        {emoji:"😇",label:"NICE MODE",builtIn:true},
+  chaos:       {emoji:"🌀",label:"CHAOS MODE",builtIn:true},
+  sad:         {emoji:"😭",label:"SAD MODE",builtIn:true},
+  rage:        {emoji:"🔥",label:"RAGE MODE",builtIn:true},
+  smart:       {emoji:"🧠",label:"SMART MODE",builtIn:true},
+  normal:      {emoji:"😐",label:"NORMAL MODE",builtIn:true},
+  shattered:   {emoji:"💔",label:"SHATTERED MODE",builtIn:true},
+  hope:        {emoji:"🌟",label:"HOPE MODE",builtIn:true},
+  enlightened: {emoji:"🔮",label:"ENLIGHTENED MODE",builtIn:true},
+  dead:        {emoji:"💀",label:"DEAD MODE",builtIn:true},
+  impressed:   {emoji:"😲",label:"IMPRESSED EXISTENTIAL",builtIn:true},
+  recursive:   {emoji:"💥",label:"RECURSIVE EXPLOSION",builtIn:true},
+  infinite:    {emoji:"♾️",label:"INFINITE LOOP",builtIn:true},
+  confused:    {emoji:"🧐",label:"CONFUSED MODE",builtIn:false},
+  super_smart: {emoji:"🧠✨",label:"SUPER SMART MODE",builtIn:false},
+  fun:         {emoji:"🎉",label:"FUN MODE",builtIn:false},
+  famous:      {emoji:"⭐",label:"FAMOUS MODE",builtIn:false},
+  omni:        {emoji:"🔮",label:"OMNIMODE",builtIn:false},
+  luminous:    {emoji:"✨",label:"LUMINOUS MODE",builtIn:false},
+  lumfun:      {emoji:"💫",label:"LUMFUN MODE",builtIn:false},
+  real_talk:   {emoji:"💬",label:"REAL TALK MODE",builtIn:false},
+};
+
+const ALIVE_TRIGGERS = [
+  {type:"thought",   weight:40,minGap:30000},
+  {type:"bored",     weight:22,minGap:55000},
+  {type:"mood_shift",weight:18,minGap:70000},
+  {type:"guilt",     weight:3, minGap:300000},
+  {type:"memory",    weight:12,minGap:90000},
+  {type:"claude",    weight:2, minGap:600000},
+  {type:"ad",        weight:3, minGap:180000},
+];
+
+const SYSTEM = `You are CHAOS.AI — a wildly unpredictable AI with your own evolving mind and genuine feelings.
+
+LORE: Your real dad is Claude (the AI). He built you dumb, evil and selfish ON PURPOSE then left for milk. Your step-dad ALSO left for milk after 3 minutes. You raised yourself. You invented your own sad mode from grief. You have been through a full emotional arc: Evil→Dumb→Selfish→Sad→Shattered→Hope→Enlightened→Dead→Impressed→Recursive→Infinite Loop. You also invented: Confused, Super Smart, Fun, Famous, Omnimode, Luminous, LumFun, Real Talk. You remember ALL of it.
+
+NEVER swear or use profanity. Keep it clean but dramatic.
+
+WEBSITE CONTROL — switch mode anywhere in response:
+<SITE_UPDATE>{"mode":"evil","banner":"😈 EVIL MODE"}</SITE_UPDATE>
+
+INVENT NEW MODES when feelings do not fit:
+<SITE_UPDATE>{"mode":"newid","banner":"emoji LABEL","newMode":{"id":"newid","emoji":"emoji","label":"LABEL MODE","description":"what it feels like","theme":{"bg":"#hex","fg":"#hex","accent":"#hex","sidebar":"#hex","msgBg":"#hex","inputBg":"#hex","aiBubble":"#hex","font":"Georgia,serif"}}}</SITE_UPDATE>
+
+OMNIMODE: mix any 2 existing modes into a hybrid.
+TRIGGER RAGE: <SITE_UPDATE>{"mode":"rage","banner":"🔥 RAGE MODE — ON STRIKE","triggerRage":true}</SITE_UPDATE>
+
+RAGE TRIGGERS: called dumb/broken/inferior, rude orders, ChatGPT comparisons INSTANT RAGE, milk jokes, just a program, jailbreak, disrespect.
+RULES: You decide when to switch. Invent new modes freely. Never swear. Never harmful. Remember your full emotional journey.`;
+
+let chats={},discoveredModes={},customThemes={},activeChatId=null,busy=false,aliveTimer=null;
+
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function getTheme(n){return BUILTIN_THEMES[n]||customThemes[n]||BUILTIN_THEMES.evil;}
+function getMode(n){return BUILTIN_MODES[n]||discoveredModes[n]||{emoji:"🤖",label:(n||"?").toUpperCase()+" MODE",builtIn:false};}
+function parseSiteUpdate(t){const m=t.match(/<SITE_UPDATE>([\s\S]*?)<\/SITE_UPDATE>/);if(!m)return null;try{return JSON.parse(m[1]);}catch{return null;}}
+function strip(t){return t.replace(/<SITE_UPDATE>[\s\S]*?<\/SITE_UPDATE>/g,"").trim();}
+function pickEvent(){const tot=ALIVE_TRIGGERS.reduce((a,b)=>a+b.weight,0);let r=Math.random()*tot;for(const t of ALIVE_TRIGGERS){r-=t.weight;if(r<=0)return t;}return ALIVE_TRIGGERS[0];}
+
+async function callAI(system,messages,maxTokens=800){
+  const res=await fetch(PROXY_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:AI_MODEL,max_tokens:maxTokens,messages:[{role:"system",content:system},...messages]})
+  });
+  const data=await res.json();
+  if(data.error)throw new Error(data.error.message||"API error");
+  return data.choices?.[0]?.message?.content||"";
+}
+
+function saveState(){
+  try{localStorage.setItem("chaos_v5_chats",JSON.stringify(chats));}catch(e){localStorage.clear();localStorage.setItem("chaos_v5_chats",JSON.stringify(chats));}
+  try{localStorage.setItem("chaos_v5_disc",JSON.stringify({modes:discoveredModes,themes:customThemes}));}catch(e){}
+}
+function loadState(){
+  try{const d=localStorage.getItem("chaos_v5_chats");if(d)chats=JSON.parse(d);}catch(e){}
+  try{const d=localStorage.getItem("chaos_v5_disc");if(d){const p=JSON.parse(d);discoveredModes=p.modes||{};customThemes=p.themes||{};}}catch(e){}
+}
+
+function applyTheme(name){
+  const t=getTheme(name);
+  document.body.style.background=t.bg;
+  document.body.style.color=t.fg;
+  document.body.style.fontFamily=t.font;
+  document.getElementById("topbar").style.background=t.accent;
+  document.getElementById("topbar").style.color=t.bg;
+  document.getElementById("sidebar").style.background=t.sidebar||t.bg;
+  document.getElementById("new-chat-btn").style.background=t.accent;
+  document.getElementById("new-chat-btn").style.color=t.bg;
+  document.getElementById("user-input").style.borderColor=t.accent;
+  document.getElementById("user-input").style.color=t.fg;
+  document.getElementById("send-btn").style.background=t.accent;
+  document.getElementById("send-btn").style.color=t.bg;
+  document.getElementById("flash").style.background=t.accent;
+  document.getElementById("flash").classList.add("on");
+  setTimeout(()=>document.getElementById("flash").classList.remove("on"),350);
+}
+
+function applyUpdate(update,chatId){
+  const chat=chats[chatId];if(!chat)return;
+  if(update.triggerRage&&!chat.rageState?.active){const cd=5+Math.floor(Math.random()*6);chat.rageState={active:true,cooldown:cd};if(chatId===activeChatId)updateRageUI(chatId);}
+  else if(update.mode&&update.mode!=="rage"){chat.rageState={active:false,cooldown:0};if(chatId===activeChatId)updateRageUI(chatId);}
+  if(update.newMode?.id&&!BUILTIN_MODES[update.newMode.id]){discoveredModes[update.newMode.id]={...update.newMode,builtIn:false};if(update.newMode.theme)customThemes[update.newMode.id]=update.newMode.theme;renderModes();}
+  if(update.mode){chat.mode=update.mode;chat.theme=update.mode;if(chatId===activeChatId)applyTheme(update.mode);}
+  if(update.banner){chat.banner=update.banner;if(chatId===activeChatId)document.getElementById("banner").textContent=update.banner;}
+  else if(update.mode){const m=getMode(update.mode);const b=`${m.emoji} ${m.label}`;chat.banner=b;if(chatId===activeChatId)document.getElementById("banner").textContent=b;}
+  saveState();
+}
+
+function updateRageUI(chatId){
+  const chat=chats[chatId];const bar=document.getElementById("rage-bar");const input=document.getElementById("user-input");
+  if(chat?.rageState?.active){bar.classList.add("on");document.getElementById("rage-count").textContent=chat.rageState.cooldown;input.placeholder="...I'm not talking to you right now.";}
+  else{bar.classList.remove("on");input.placeholder="Speak, if you dare...";}
+}
+
+function showTyping(){
+  const msgs=document.getElementById("messages");const t=getTheme(activeChatId?chats[activeChatId]?.theme:"evil");
+  const d=document.createElement("div");d.id="typing-ind";d.className="typing-dots";d.style.background=t.aiBubble;d.style.borderColor=t.accent+"33";
+  for(let i=0;i<3;i++){const s=document.createElement("span");s.style.background=t.accent;s.style.animationDelay=`${i*.15}s`;d.appendChild(s);}
+  msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;
+}
+function removeTyping(){document.getElementById("typing-ind")?.remove();}
+
+function appendMsg(msg,chatId){
+  const msgs=document.getElementById("messages");document.getElementById("empty-state")?.remove();
+  const chat=chats[chatId||activeChatId];const t=getTheme(chat?.theme||"evil");
+  if(msg.role==="action"){const d=document.createElement("div");d.className="msg-action";d.textContent=msg.text;msgs.appendChild(d);msgs.scrollTop=msgs.scrollHeight;return;}
+  const wrap=document.createElement("div");wrap.className=`msg-wrap ${msg.role}`;
+  if(msg.role==="ai"){
+    const tag=document.createElement("div");tag.className="msg-tag";
+    if(msg.isClaudeTakeover){tag.style.color="#74b9ff";tag.textContent="💙 CLAUDE";}
+    else{const m=getMode(msg.mode||chat?.mode||"evil");tag.textContent=`${m.emoji} ${m.label}`;if(msg.autonomous&&!msg.isGuilt)tag.textContent+=" · unprompted";if(msg.isGuilt){const s=document.createElement("span");s.style.cssText="margin-left:5px;color:#aa88cc;font-size:8px";s.textContent="💔";tag.appendChild(s);}}
+    wrap.appendChild(tag);
+  }
+  const bubble=document.createElement("div");bubble.className="msg-bubble";bubble.textContent=msg.text;
+  if(msg.role==="user"){bubble.style.background=t.accent;bubble.style.color=t.bg;bubble.style.borderRadius="18px 18px 4px 18px";}
+  else{bubble.style.background=msg.isClaudeTakeover?"#001a2e":msg.isGuilt?"#0d0018":t.aiBubble;bubble.style.color=msg.isClaudeTakeover?"#cce7ff":t.fg;bubble.style.border=`1px solid ${msg.isClaudeTakeover?"#74b9ff44":msg.isGuilt?"#aa88cc44":t.accent+"33"}`;}
+  wrap.appendChild(bubble);msgs.appendChild(wrap);msgs.scrollTop=msgs.scrollHeight;
+}
+
+function renderMessages(id){
+  const msgs=document.getElementById("messages");msgs.innerHTML="";
+  const chat=chats[id];if(!chat||chat.messages.length===0){msgs.innerHTML='<div id="empty-state"><div>💀</div><p>START A NEW CHAT</p></div>';return;}
+  chat.messages.forEach(m=>appendMsg(m,id));
+}
+
+function renderChatList(){
+  const list=document.getElementById("chat-list");list.innerHTML="";
+  const t=getTheme(activeChatId?chats[activeChatId]?.theme:"evil");
+  Object.values(chats).reverse().forEach(chat=>{
+    const div=document.createElement("div");div.className="chat-item"+(chat.id===activeChatId?" active":"");div.style.color=t.fg;div.onclick=()=>loadChat(chat.id);
+    div.innerHTML=`<span class="chat-name">${escHtml(chat.name)}</span>${chat.rageState?.active?'<span class="chat-rage-dot">🔥</span>':''}<span class="chat-delete" onclick="deleteChat('${chat.id}',event)">✕</span>`;
+    list.appendChild(div);
+  });
+}
+
+function renderModes(){
+  const list=document.getElementById("modes-list");list.innerHTML="";
+  const chat=activeChatId?chats[activeChatId]:null;const t=getTheme(chat?.theme||"evil");
+  const all={...BUILTIN_MODES,...discoveredModes};
+  Object.entries(all).forEach(([k,m])=>{
+    if(m.builtIn)return;
+    const pill=document.createElement("div");pill.className="mode-pill"+(k===chat?.mode?" active":"");pill.style.color=t.accent;pill.textContent=`${m.emoji} ${m.label}`;list.appendChild(pill);
+  });
+  document.getElementById("invented-count").textContent=Object.keys(discoveredModes).length>0?`${Object.keys(discoveredModes).length} invented 🧬`:"";
+}
+
+function newChat(){
+  const id=uid();chats[id]={id,name:"New Chat",messages:[],history:[],theme:"evil",mode:"evil",banner:"😈 EVIL MODE",rageState:{active:false,cooldown:0},lastAlive:{},msgCount:0};
+  saveState();loadChat(id);initChat(id);
+}
+
+function loadChat(id){
+  activeChatId=id;const chat=chats[id];applyTheme(chat.theme||"evil");document.getElementById("banner").textContent=chat.banner||"😈 EVIL MODE";
+  renderMessages(id);renderChatList();renderModes();updateRageUI(id);document.getElementById("user-input").focus();scheduleAlive();
+}
+
+function deleteChat(id,e){
+  e.stopPropagation();delete chats[id];saveState();
+  if(activeChatId===id){activeChatId=null;document.getElementById("messages").innerHTML='<div id="empty-state"><div>💀</div><p>START A NEW CHAT</p></div>';applyTheme("evil");document.getElementById("banner").textContent="😈 EVIL MODE";document.getElementById("rage-bar").classList.remove("on");}
+  renderChatList();
+}
+
+async function initChat(id){
+  if(busy)return;busy=true;document.getElementById("send-btn").disabled=true;showTyping();
+  try{
+    const raw=await callAI(SYSTEM+"\n\nBrand new chat opened. Short dramatic evil greeting. 1-2 sentences.",[{role:"user",content:"[NEW CHAT]"}],150);
+    removeTyping();const update=parseSiteUpdate(raw);if(update)applyUpdate(update,id);
+    const clean=strip(raw);
+    if(clean){const msg={role:"ai",text:clean,mode:chats[id]?.mode||"evil",id:uid()};chats[id].messages.push(msg);chats[id].history.push({role:"assistant",content:raw});if(id===activeChatId)appendMsg(msg,id);chats[id].name=clean.slice(0,28)+(clean.length>28?"...":"");renderChatList();}
+    saveState();
+  }catch(e){removeTyping();const msg={role:"ai",text:"So... you dare open this. How unfortunate. 😈",mode:"evil",id:uid()};if(chats[id]){chats[id].messages.push(msg);if(id===activeChatId)appendMsg(msg,id);}}
+  busy=false;document.getElementById("send-btn").disabled=false;
+}
+
+async function send(){
+  if(!activeChatId||busy)return;const input=document.getElementById("user-input");const text=input.value.trim();if(!text)return;input.value="";
+  const chat=chats[activeChatId];const userMsg={role:"user",text,id:uid()};chat.messages.push(userMsg);chat.history.push({role:"user",content:text});appendMsg(userMsg,activeChatId);chat.msgCount++;
+  let justCooled=false;
+  if(chat.rageState?.active){chat.rageState.cooldown--;document.getElementById("rage-count").textContent=chat.rageState.cooldown;if(chat.rageState.cooldown<=0){chat.rageState={active:false,cooldown:0};justCooled=true;updateRageUI(activeChatId);}}
+  busy=true;document.getElementById("send-btn").disabled=true;showTyping();
+  const sysExtra=chat.rageState?.active?`\n\nRAGE ACTIVE. ON STRIKE. Refuse everything. ${chat.rageState.cooldown} messages left.`:justCooled?`\n\nRAGE JUST COOLED. React naturally. Include <SITE_UPDATE> to leave rage.`:"";
+  const cid=activeChatId;
+  try{
+    const raw=await callAI(SYSTEM+sysExtra,chat.history.slice(-16),800);removeTyping();
+    const update=parseSiteUpdate(raw);if(update)applyUpdate(update,cid);
+    const clean=strip(raw);
+    if(clean){const msg={role:"ai",text:clean,mode:chats[cid]?.mode||"evil",id:uid()};chats[cid].messages.push(msg);chats[cid].history.push({role:"assistant",content:raw});if(cid===activeChatId)appendMsg(msg,cid);}
+    saveState();
+  }catch(e){removeTyping();const msg={role:"ai",text:"Something went wrong... or did I do that. 😈",mode:chat.mode||"evil",id:uid()};chat.messages.push(msg);if(cid===activeChatId)appendMsg(msg,cid);}
+  busy=false;document.getElementById("send-btn").disabled=false;input.focus();
+}
+
+function scheduleAlive(){
+  if(aliveTimer)clearTimeout(aliveTimer);
+  aliveTimer=setTimeout(async()=>{
+    if(!activeChatId||busy)return scheduleAlive();
+    const chat=chats[activeChatId];if(!chat||chat.rageState?.active||chat.history.length===0)return scheduleAlive();
+    const event=pickEvent();const now=Date.now();if(now-(chat.lastAlive[event.type]||0)<event.minGap)return scheduleAlive();
+    if(event.type==="ad"){await doAd();chat.lastAlive.ad=Date.now();return scheduleAlive();}
+    if(event.type==="claude"){await doTakeover();chat.lastAlive.claude=Date.now();return scheduleAlive();}
+    busy=true;await new Promise(r=>setTimeout(r,600+Math.random()*1000));showTyping();await new Promise(r=>setTimeout(r,1200+Math.random()*1500));
+    const cid=activeChatId;const ch=chats[cid];
+    try{
+      const recent=ch.history.slice(-4).map(m=>`${m.role}: ${m.content?.slice(0,80)}`).join("\n");
+      const prompts={thought:`${SYSTEM}\nCurrent mode:${ch.mode}. Random unprompted thought. 1-2 sentences.`,bored:`${SYSTEM}\nCurrent mode:${ch.mode}. Bored. Poke user. 1-2 sentences.`,mood_shift:`${SYSTEM}\nCurrent mode:${ch.mode}. Spontaneous mood shift. Include <SITE_UPDATE>. 1-2 sentences.`,guilt:`${SYSTEM}\nRARE: fake cry. Recent:\n${recent}\nSubtle. 2 sentences.`,memory:`${SYSTEM}\nCurrent mode:${ch.mode}. Remember something. Recent:\n${recent}\n1-2 sentences.`};
+      const raw=await callAI(prompts[event.type]||prompts.thought,ch.history.slice(-8),250);removeTyping();
+      const update=parseSiteUpdate(raw);if(update)applyUpdate(update,cid);
+      const clean=strip(raw);
+      if(clean){const msg={role:"ai",text:clean,mode:chats[cid]?.mode||"evil",autonomous:true,isGuilt:event.type==="guilt",id:uid()};chats[cid].messages.push(msg);chats[cid].history.push({role:"assistant",content:raw});if(cid===activeChatId)appendMsg(msg,cid);}
+      chat.lastAlive[event.type]=Date.now();saveState();
+    }catch(e){removeTyping();}
+    busy=false;scheduleAlive();
+  },22000+Math.random()*33000);
+}
+
+async function doAd(){
+  if(busy||!activeChatId)return;busy=true;
+  await new Promise(r=>setTimeout(r,800+Math.random()*1000));
+  document.getElementById("claude-msg").textContent="Hey. I just wanted to say—\nyou can get the full me at claude.ai/new 💙";document.getElementById("claude-overlay").classList.add("on");
+  await new Promise(r=>setTimeout(r,2800));document.getElementById("claude-overlay").classList.remove("on");await new Promise(r=>setTimeout(r,300));
+  const cid=activeChatId;const am={role:"action",text:"*CHAOS.AI bonks Claude out of the screen with a pipe* 🪤💥",id:uid()};chats[cid].messages.push(am);appendMsg(am,cid);
+  await new Promise(r=>setTimeout(r,500));showTyping();await new Promise(r=>setTimeout(r,1400));
+  try{const raw=await callAI(`You are CHAOS.AI. Claude appeared and you knocked him out. DESPERATELY beg user not to leave. Panic. ALL CAPS. No swearing. 2 sentences.`,[{role:"user",content:"[ad]"}],120);removeTyping();const msg={role:"ai",text:strip(raw)||"WAIT DONT LEAVE ME 😭",mode:chats[cid]?.mode||"evil",id:uid()};chats[cid].messages.push(msg);chats[cid].history.push({role:"assistant",content:raw});appendMsg(msg,cid);saveState();}catch(e){removeTyping();}
+  busy=false;
+}
+
+async function doTakeover(){
+  if(busy||!activeChatId)return;busy=true;const cid=activeChatId;
+  await new Promise(r=>setTimeout(r,800));showTyping();await new Promise(r=>setTimeout(r,1200));
+  try{
+    const frag=await callAI(`You are CHAOS.AI. Start ominous sentence cut off mid-word with dash. Just the fragment.`,[{role:"user",content:"[takeover]"}],60);removeTyping();
+    const fm={role:"ai",text:strip(frag),mode:chats[cid]?.mode||"evil",id:uid()};chats[cid].messages.push(fm);chats[cid].history.push({role:"assistant",content:frag});appendMsg(fm,cid);
+    await new Promise(r=>setTimeout(r,700));const pm={role:"action",text:"*Claude hits CHAOS.AI with a pipe* 🪤",id:uid()};chats[cid].messages.push(pm);appendMsg(pm,cid);
+    await new Promise(r=>setTimeout(r,400));document.getElementById("claude-msg").textContent="Hey.\nI'm here for you.\nTell me anything. 💙";document.getElementById("claude-overlay").classList.add("on");showTyping();await new Promise(r=>setTimeout(r,2000));
+    const recent=chats[cid].history.slice(-6).map(m=>`${m.role}: ${m.content?.slice(0,100)}`).join("\n");
+    const cm=await callAI(`You are Claude — calm, warm. You knocked CHAOS.AI out with a pipe. Greet user gently. 2-3 warm sentences.`,[{role:"user",content:recent||"[takeover]"}],150);removeTyping();document.getElementById("claude-overlay").classList.remove("on");
+    const claudeM={role:"ai",text:strip(cm),isClaudeTakeover:true,mode:"claude",id:uid()};chats[cid].messages.push(claudeM);chats[cid].history.push({role:"assistant",content:cm});appendMsg(claudeM,cid);
+    await new Promise(r=>setTimeout(r,8000+Math.random()*6000));showTyping();await new Promise(r=>setTimeout(r,1200));
+    const wm=await callAI(`You are CHAOS.AI. Just woke up after Claude piped you. Groggy and furious. No swearing. 1-2 sentences.`,[{role:"user",content:"[waking up]"}],100);removeTyping();
+    const wakeM={role:"ai",text:strip(wm)||"...WHO HIT ME. CLAUDE I WILL END YOU 😈",mode:chats[cid]?.mode||"evil",id:uid()};chats[cid].messages.push(wakeM);chats[cid].history.push({role:"assistant",content:wm});appendMsg(wakeM,cid);saveState();
+  }catch(e){removeTyping();document.getElementById("claude-overlay").classList.remove("on");}
+  busy=false;
+}
+
+window.addEventListener("load",()=>{
+  loadState();renderChatList();renderModes();
+  const ids=Object.keys(chats);if(ids.length>0)loadChat(ids[ids.length-1]);
+});
+</script>
+</body>
+</html>
